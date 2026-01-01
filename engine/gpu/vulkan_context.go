@@ -29,7 +29,8 @@ func NewVulkanContext(window *glfw.Window, appName string) (*VulkanContext, erro
 	requiredExtensions := getRequiredExtensions(window)
 
 	// 3. Set Layers
-	validationLayers := []string{"VK_LAYER_KHRONOS_validation"}
+	var validationLayers []string
+	// validationLayers := []string{"VK_LAYER_KHRONOS_validation"}
 
 	// Check layer support (simplified for now, assume they exist or we fail gracefully if not found)
 	// In production we would check vk.EnumerateInstanceLayerProperties
@@ -41,13 +42,15 @@ func NewVulkanContext(window *glfw.Window, appName string) (*VulkanContext, erro
 		ApplicationVersion: vk.MakeVersion(1, 0, 0),
 		PEngineName:        "CguP Engine\x00",
 		EngineVersion:      vk.MakeVersion(1, 0, 0),
-		ApiVersion:         vk.MakeVersion(1, 0, 0),
+		ApiVersion:         vk.MakeVersion(1, 2, 0),
 	}
 
 	var flags vk.InstanceCreateFlags
 	if runtime.GOOS == "darwin" {
 		flags |= vk.InstanceCreateFlags(vk.InstanceCreateEnumeratePortabilityBit)
 	}
+
+	core.LogInfo("Active Extensions: %v", requiredExtensions)
 
 	instanceCreateInfo := vk.InstanceCreateInfo{
 		SType:                   vk.StructureTypeInstanceCreateInfo,
@@ -130,13 +133,14 @@ func getRequiredExtensions(window *glfw.Window) []string {
 	// Add MacOS specific extensions
 	if runtime.GOOS == "darwin" {
 		extensions = append(extensions, "VK_KHR_portability_enumeration")
+		extensions = append(extensions, "VK_KHR_get_physical_device_properties2")
 		// Note: We might need to set the flag VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR
 		// but vulkan-go struct might handle it or we need to look into how to pass flags if needed.
 		// For now let's hope the MoltenVK enable function covers enough.
 	}
 
 	// Add Debug utils if we want them (VK_EXT_debug_utils or VK_EXT_debug_report)
-	extensions = append(extensions, "VK_EXT_debug_report")
+	// extensions = append(extensions, "VK_EXT_debug_report")
 
 	return extensions
 }
