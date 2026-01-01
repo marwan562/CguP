@@ -70,6 +70,7 @@ func NewVulkanContext(window *glfw.Window, appName string) (*VulkanContext, erro
 	// 5. Select Physical Device
 	physicalDevice, err := pickPhysicalDevice(instance)
 	if err != nil {
+		vk.DestroyInstance(instance, nil)
 		return nil, err
 	}
 
@@ -80,24 +81,27 @@ func NewVulkanContext(window *glfw.Window, appName string) (*VulkanContext, erro
 }
 
 func (ctx *VulkanContext) Destroy() {
-	if ctx.Instance != nil {
+	var emptyInstance vk.Instance
+	if ctx.Instance != emptyInstance {
 		vk.DestroyInstance(ctx.Instance, nil)
+		ctx.Instance = emptyInstance
 	}
 }
 
 func pickPhysicalDevice(instance vk.Instance) (vk.PhysicalDevice, error) {
+	var emptyPhysicalDevice vk.PhysicalDevice
 	var count uint32
 	if err := vk.Error(vk.EnumeratePhysicalDevices(instance, &count, nil)); err != nil {
-		return nil, err
+		return emptyPhysicalDevice, err
 	}
 
 	if count == 0 {
-		return nil, fmt.Errorf("failed to find GPUs with Vulkan support")
+		return emptyPhysicalDevice, fmt.Errorf("failed to find GPUs with Vulkan support")
 	}
 
 	devices := make([]vk.PhysicalDevice, count)
 	if err := vk.Error(vk.EnumeratePhysicalDevices(instance, &count, devices)); err != nil {
-		return nil, err
+		return emptyPhysicalDevice, err
 	}
 
 	// Just pick the first one for now
