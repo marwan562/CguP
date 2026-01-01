@@ -2,69 +2,13 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
-	"sync"
+	"strings"
 	"time"
+
+	"github.com/marwan562/CguP/pkg/compute"
+	"github.com/marwan562/CguP/pkg/core"
 )
-
-type Entity struct {
-	Position [3]float64
-	Velocity [3]float64
-	Data     [100]float64
-}
-
-func (e *Entity) complexUpdate(dt float64) {
-	for i := 0; i < 3; i++ {
-		e.Position[i] += e.Velocity[i] * dt
-	}
-
-	for i := 0; i < 100; i++ {
-		e.Data[i] = math.Sin(e.Data[i]) * math.Cos(e.Position[0])
-		e.Data[i] = math.Sqrt(math.Abs(e.Data[i])) + 0.001
-	}
-}
-
-func (e *Entity) simpleUpdate(dt float64) {
-	for i := 0; i < 3; i++ {
-		e.Position[i] += e.Velocity[i] * dt
-	}
-}
-
-func updateSequential(entities []*Entity, dt float64, complex bool) {
-	for _, e := range entities {
-		if complex {
-			e.complexUpdate(dt)
-		} else {
-			e.simpleUpdate(dt)
-		}
-	}
-}
-
-func updateParallel(entities []*Entity, dt float64, batchSize int, complex bool) {
-	var wg sync.WaitGroup
-
-	for i := 0; i < len(entities); i += batchSize {
-		end := i + batchSize
-		if end > len(entities) {
-			end = len(entities)
-		}
-
-		wg.Add(1)
-		go func(batch []*Entity) {
-			defer wg.Done()
-			for _, e := range batch {
-				if complex {
-					e.complexUpdate(dt)
-				} else {
-					e.simpleUpdate(dt)
-				}
-			}
-		}(entities[i:end])
-	}
-
-	wg.Wait()
-}
 
 func benchmark(name string, fn func()) time.Duration {
 	start := time.Now()
@@ -74,10 +18,10 @@ func benchmark(name string, fn func()) time.Duration {
 	return duration
 }
 
-func createEntities(count int) []*Entity {
-	entities := make([]*Entity, count)
+func createEntities(count int) []*core.Entity {
+	entities := make([]*core.Entity, count)
 	for i := 0; i < count; i++ {
-		entities[i] = &Entity{
+		entities[i] = &core.Entity{
 			Position: [3]float64{rand.Float64(), rand.Float64(), rand.Float64()},
 			Velocity: [3]float64{rand.Float64(), rand.Float64(), rand.Float64()},
 		}
@@ -92,7 +36,9 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	dt := 0.016
 
-	fmt.Println("=== GAME ENGINE PARALLELISM BENCHMARK ===\n")
+	fmt.Println("=== GAME ENGINE PARALLELISM BENCHMARK (REFACTORED) ===\n")
+
+	seqUpdater := &compute.SequentialUpdater{}
 
 	fmt.Println("TEST 1: 100 entities with SIMPLE updates")
 	fmt.Println("Expected: Sequential faster (goroutine overhead > work)")
@@ -101,13 +47,14 @@ func main() {
 	entities := createEntities(100)
 	seq1 := benchmark("Sequential (100 simple)", func() {
 		for i := 0; i < 100; i++ {
-			updateSequential(entities, dt, false)
+			seqUpdater.Update(entities, dt, false)
 		}
 	})
 
+	parUpdater10 := compute.NewParallelUpdater(10)
 	par1 := benchmark("Parallel batch=10 (100 simple)", func() {
 		for i := 0; i < 100; i++ {
-			updateParallel(entities, dt, 10, false)
+			parUpdater10.Update(entities, dt, false)
 		}
 	})
 
@@ -121,13 +68,14 @@ func main() {
 	entities = createEntities(10000)
 	seq2 := benchmark("Sequential (10k simple)", func() {
 		for i := 0; i < 10; i++ {
-			updateSequential(entities, dt, false)
+			seqUpdater.Update(entities, dt, false)
 		}
 	})
 
+	parUpdater1000 := compute.NewParallelUpdater(1000)
 	par2 := benchmark("Parallel batch=1000 (10k simple)", func() {
 		for i := 0; i < 10; i++ {
-			updateParallel(entities, dt, 1000, false)
+			parUpdater1000.Update(entities, dt, false)
 		}
 	})
 
@@ -141,19 +89,21 @@ func main() {
 	entities = createEntities(1000)
 	seq3 := benchmark("Sequential (1k complex)", func() {
 		for i := 0; i < 10; i++ {
-			updateSequential(entities, dt, true)
+			seqUpdater.Update(entities, dt, true)
 		}
 	})
 
+	parUpdater50 := compute.NewParallelUpdater(50)
 	par3_small := benchmark("Parallel batch=50 (1k complex)", func() {
 		for i := 0; i < 10; i++ {
-			updateParallel(entities, dt, 50, true)
+			parUpdater50.Update(entities, dt, true)
 		}
 	})
 
+	parUpdater200 := compute.NewParallelUpdater(200)
 	par3_large := benchmark("Parallel batch=200 (1k complex)", func() {
 		for i := 0; i < 10; i++ {
-			updateParallel(entities, dt, 200, true)
+			parUpdater200.Update(entities, dt, true)
 		}
 	})
 
@@ -168,11 +118,11 @@ func main() {
 
 	entities = createEntities(50000)
 	seq4 := benchmark("Sequential (50k complex)", func() {
-		updateSequential(entities, dt, true)
+		seqUpdater.Update(entities, dt, true)
 	})
 
 	par4 := benchmark("Parallel batch=1000 (50k complex)", func() {
-		updateParallel(entities, dt, 1000, true)
+		parUpdater1000.Update(entities, dt, true)
 	})
 
 	speedup = float64(seq4) / float64(par4)
@@ -198,17 +148,4 @@ func getVerdict(speedup float64) string {
 	} else {
 		return "MUCH FASTER (excellent speedup)"
 	}
-}
-
-// Helper to avoid import
-var strings = struct {
-	Repeat func(string, int) string
-}{
-	Repeat: func(s string, count int) string {
-		result := ""
-		for i := 0; i < count; i++ {
-			result += s
-		}
-		return result
-	},
 }
