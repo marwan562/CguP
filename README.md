@@ -1,40 +1,48 @@
-# CguP - Concurrent Game Update Package
+# CguP - Concurrent Go Rendering Engine
 
-A high-performance, concurrent entity update system for Go game engines.
+<div align="center">
 
-## Overview
+[![Go](https://github.com/marwan562/CguP/actions/workflows/go.yml/badge.svg)](https://github.com/marwan562/CguP/actions/workflows/go.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-This package provides a modular way to handle entity updates, specifically designed to leverage multi-core CPUs for complex simulation logic.
+**A modern, data-oriented rendering engine written in Go, powered by Vulkan.**
+Build for learning, research, and high-performance indie games.
+
+[Contributing](CONTRIBUTING.md) • [Architecture](ARCHITECTURE.md) • [Roadmap](ROADMAP.md)
+
+</div>
+
+## Vision
+
+CguP aims to demonstrate how Go's currency primitives (Goroutines, Channels) can be effectively used in a high-performance graphics engine. We prioritize **architecture** and **parallelism** over raw single-threaded speed.
+
+## Features (Planned)
+
+- 🚀 **Vulkan Backend**: Modern, explicit GPU control.
+- 🧵 **Concurrent Architecture**: Parallel command recording and asset loading.
+- 🧩 **Modular Design**: Clear separation of Core, Platform, and GPU layers.
+- 📄 **Render Graph**: Automatic resource barrier management and pass reordering.
+
+## Getting Started
+
+### Prerequisites
+- **Go 1.25+**
+- **Vulkan SDK** (Required for MoltenVK on macOS)
+
+### Running the Demo
+```bash
+# On macOS
+go mod tidy
+CGO_CFLAGS="-I/opt/homebrew/include" CGO_LDFLAGS="-L/opt/homebrew/lib" go run cmd/demo/main.go
+```
 
 ## Structure
 
-- `pkg/core`: Core entity definitions.
-- `pkg/compute`: Update strategies (Sequential and Parallel).
-- `cmd/benchmark`: Performance benchmarking tool.
+- `engine/core`: Basic utilities (Logging, Config).
+- `engine/platform`: Windowing and Input (GLFW).
+- `engine/gpu`: Vulkan wrappers and context management.
+- `pkg/compute`: (Legacy) CPU-bound entity update prototypes.
 
-## Usage
+## License
 
-```go
-import (
-    "github.com/marwan562/CguP/pkg/core"
-    "github.com/marwan562/CguP/pkg/compute"
-)
-
-// Create entities
-entities := make([]*core.Entity, 1000)
-// ... init entities
-
-// Create a parallel updater with batch size 100
-updater := compute.NewParallelUpdater(100)
-
-// Update loop
-updater.Update(entities, 0.016, true)
-```
-
-## Benchmarks
-
-Run the included benchmark to see the speedup on your machine:
-
-```bash
-go run cmd/benchmark/main.go
-```
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
